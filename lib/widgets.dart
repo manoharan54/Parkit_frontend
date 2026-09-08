@@ -13,6 +13,58 @@ Widget appFieldLabel(String text) => Padding(
       child: Text(text, style: const TextStyle(fontWeight: FontWeight.w700)),
     );
 
+/// Themed in-app notification: floating dark snackbar matching the ParkIt theme.
+/// Use for all lightweight confirmations (share, download, extend, ...).
+void showParkitSnack(BuildContext context, String message,
+    {IconData icon = Icons.check_circle_rounded,
+    String? actionLabel,
+    VoidCallback? onAction}) {
+  final messenger = ScaffoldMessenger.of(context);
+  messenger.hideCurrentSnackBar();
+  messenger.showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      backgroundColor: AppColors.cardBackground,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(AppSpacing.radiusMedium),
+      ),
+      margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+      duration: const Duration(seconds: 4),
+      action: actionLabel == null || onAction == null
+          ? null
+          : SnackBarAction(
+              label: actionLabel,
+              textColor: AppColors.accent,
+              onPressed: onAction,
+            ),
+      content: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(7),
+            decoration: BoxDecoration(
+              color: AppColors.accent.withValues(alpha: 0.22),
+              borderRadius: BorderRadius.circular(10),
+            ),
+            child: Icon(icon, color: AppColors.accent, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              message,
+              style: const TextStyle(
+                color: Colors.white,
+                fontSize: 14,
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
+}
+
 /// Metric widget showing a value and label, used on home screen.
 class AppMetric extends StatelessWidget {
   const AppMetric({required this.value, required this.label, super.key});

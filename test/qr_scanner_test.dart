@@ -1,144 +1,173 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:flutter/material.dart';
+import 'package:mobile_scanner/mobile_scanner.dart';
 import 'package:parkit_flutter/qr_scanner_view.dart';
 import 'package:parkit_flutter/main.dart';
 import 'package:parkit_flutter/styles.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 void main() {
   group('QRScannerView Widget Tests', () {
-    testWidgets('QR scanner view renders with AppBar and flashlight toggle', 
+    Future<void> pumpScanner(WidgetTester tester) async {
+      await tester.pumpWidget(MaterialApp(
+        home: QRScannerView(
+          onScanned: (_) {},
+        ),
+      ));
+      await tester.pump();
+    }
+
+    testWidgets('Guided header renders with back, title and helper',
       (WidgetTester tester) async {
-        await tester.pumpWidget(MaterialApp(
-          home: QRScannerView(
-            onScanned: (_) {},
-          ),
-        ));
-        
-        expect(find.text('Scan parking QR'), findsOneWidget);
-        expect(find.byIcon(Icons.flashlight_on), findsOneWidget);
+        await pumpScanner(tester);
+
+        expect(find.byIcon(Icons.arrow_back_rounded), findsOneWidget);
+        expect(find.text('Scan QR Code'), findsOneWidget);
+        expect(find.text('Align the QR code within the frame'),
+            findsOneWidget);
+        expect(find.byType(AppBar), findsNothing);
+        // Instruction block between preview and flashlight button.
+        expect(find.text('Align the QR inside the frame'),
+            findsOneWidget);
+        expect(find.text('Hold steady — scanning is automatic'),
+            findsOneWidget);
+        expect(find.text('Same code works for entry and exit'),
+            findsOneWidget);
       }
     );
 
-    testWidgets('QR scanner bottom bar contains flashlight button',
+    testWidgets('Camera is tall and overflow-free across phone sizes',
       (WidgetTester tester) async {
-        await tester.pumpWidget(MaterialApp(
-          home: QRScannerView(onScanned: (_) {}),
-        ));
-        
-        expect(find.byIcon(Icons.flashlight_on_outlined), findsOneWidget);
-        expect(find.text('Flashlight'), findsOneWidget);
+        const sizes = [
+          Size(360, 800),
+          Size(360, 740),
+          Size(390, 844),
+          Size(320, 568),
+        ];
+        for (final size in sizes) {
+          tester.view.physicalSize = size;
+          tester.view.devicePixelRatio = 1.0;
+          await pumpScanner(tester);
+
+          final preview =
+              tester.getSize(find.byType(MobileScanner));
+          // Never wider than the screen, never overflowing.
+          expect(preview.width,
+              lessThanOrEqualTo(size.width));
+          expect(tester.takeException(), isNull);
+          // Regular phones: tall portrait box (~60%+ of height).
+          if (size.height >= 700) {
+            expect(preview.height, greaterThan(preview.width));
+            expect(preview.height,
+                greaterThan(size.height * 0.55));
+          }
+          await tester.pumpWidget(const SizedBox());
+          await tester.pump();
+        }
+        addTearDown(tester.view.resetPhysicalSize);
       }
     );
 
-    testWidgets('Flashlight toggle button exists in bottom bar',
+    testWidgets('Only action is the flashlight toggle with state',
       (WidgetTester tester) async {
-        await tester.pumpWidget(MaterialApp(
-          home: QRScannerView(onScanned: (_) {}),
-        ));
-        
-        expect(find.byIcon(Icons.flashlight_on_outlined), findsOneWidget);
-        expect(find.text('Flashlight'), findsOneWidget);
-        
-        await tester.tap(find.byIcon(Icons.flashlight_on_outlined));
+        await pumpScanner(tester);
+
+        expect(find.byIcon(Icons.flashlight_off_rounded), findsOneWidget);
+        expect(find.text('Flashlight · Off'), findsOneWidget);
+
+        // No gallery, history or settings actions.
+        expect(find.byIcon(Icons.photo_library_outlined), findsNothing);
+        expect(find.byIcon(Icons.history_rounded), findsNothing);
+        expect(find.byIcon(Icons.settings_outlined), findsNothing);
+
+        // Toggle flips the visible state.
+        await tester.tap(find.text('Flashlight · Off'));
         await tester.pump();
-        
-        expect(find.byType(OutlinedButton), findsWidgets);
-      }
-    );
-
-    testWidgets('QRScannerView AppBar uses correct typography',
-      (WidgetTester tester) async {
-        await tester.pumpWidget(MaterialApp(
-          home: QRScannerView(onScanned: (_) {}),
-        ));
-        
-        final titleText = find.text('Scan parking QR');
-        expect(titleText, findsOneWidget);
-        
-        final appBar = find.byType(AppBar);
-        expect(appBar, findsOneWidget);
-      }
-    );
-
-    testWidgets('QRScannerView uses AppSpacing for layout',
-      (WidgetTester tester) async {
-        await tester.pumpWidget(MaterialApp(
-          home: QRScannerView(onScanned: (_) {}),
-        ));
-        
-        expect(find.byType(SafeArea), findsWidgets);
-        
-        final padding = find.byType(Padding);
-        expect(padding, findsWidgets);
+        expect(find.text('Flashlight · On'), findsOneWidget);
+        expect(find.byIcon(Icons.flashlight_on_rounded), findsOneWidget);
       }
     );
 
     testWidgets('QRScannerView scaffold has correct structure',
       (WidgetTester tester) async {
-        await tester.pumpWidget(MaterialApp(
-          home: QRScannerView(onScanned: (_) {}),
-        ));
-        
+        await pumpScanner(tester);
+
         expect(find.byType(Scaffold), findsOneWidget);
-        expect(find.byType(AppBar), findsOneWidget);
         expect(find.byType(SafeArea), findsWidgets);
+        expect(find.byType(FilledButton), findsOneWidget);
       }
     );
   });
 
   group('ProfileScreen Widget Tests', () {
-    testWidgets('ProfileScreen displays user information',
-      (WidgetTester tester) async {
-        final testUser = AppUser(
+    setUpAll(() {
+      SharedPreferences.setMockInitialValues({});
+    });
+
+    Future<void> pumpProfile(WidgetTester tester, AppUser user) async {
+      await tester.pumpWidget(MaterialApp(
+        home: ProfileScreen(
+          user: user,
+          onUpdated: () {},
+          onLogout: () {},
+        ),
+      ));
+      await tester.pumpAndSettle();
+    }
+
+    Future<void> scrollTo(WidgetTester tester, String text) async {
+      await tester.scrollUntilVisible(
+          find.text(text, skipOffstage: false), 400,
+          scrollable: find.byType(Scrollable).first);
+      await tester.pump();
+    }
+
+    AppUser testUser() => AppUser(
           name: 'Jane Smith',
           email: 'jane@example.com',
           phone: '+9876543210',
           vehicle: 'XYZ789',
           password: 'secure123',
         );
-        
-        await tester.pumpWidget(MaterialApp(
-          home: ProfileScreen(
-            user: testUser,
-            onUpdated: () {},
-            onLogout: () {},
-          ),
-        ));
-        
-        await tester.pump();
-        
+
+    testWidgets('ProfileScreen displays user information',
+      (WidgetTester tester) async {
+        await pumpProfile(tester, testUser());
+
         expect(find.text('My profile'), findsOneWidget);
         expect(find.text('Jane Smith'), findsOneWidget);
         expect(find.text('jane@example.com'), findsOneWidget);
-        expect(find.text('XYZ789'), findsOneWidget);
+        expect(find.text('XYZ789'), findsWidgets);
       }
     );
 
-    testWidgets('ProfileScreen menu options are accessible',
+    testWidgets('ProfileScreen shows minimal parking sections',
       (WidgetTester tester) async {
-        final testUser = AppUser(
-          name: 'Jane Smith',
-          email: 'jane@example.com',
-          phone: '+9876543210',
-          vehicle: 'XYZ789',
-          password: 'secure123',
-        );
-        
-        await tester.pumpWidget(MaterialApp(
-          home: ProfileScreen(
-            user: testUser,
-            onUpdated: () {},
-            onLogout: () {},
-          ),
-        ));
-        
-        await tester.pump();
-        
-        expect(find.text('Edit profile'), findsOneWidget);
-        expect(find.text('My vehicles'), findsOneWidget);
-        expect(find.text('Parking history'), findsOneWidget);
-        expect(find.text('About ParkIt'), findsOneWidget);
-        expect(find.text('Logout'), findsOneWidget);
+        await pumpProfile(tester, testUser());
+
+        // Core sections, scrolled into view like a real user.
+        for (final section in [
+          'My Vehicle',
+          'Manage Vehicle',
+          'Parking Statistics',
+          'Total Visits',
+          'Hours Parked',
+          'Total Spent',
+          'Account Settings',
+          'Change Password',
+          'Notifications',
+          'Version 1.0.0',
+          'View Project Info',
+        ]) {
+          await scrollTo(tester, section);
+          expect(find.text(section), findsWidgets);
+        }
+
+        // Removed settings-jungle entries must stay gone.
+        expect(find.text('Privacy settings'), findsNothing);
+        expect(find.text('Security settings'), findsNothing);
+        expect(find.text('Achievements'), findsNothing);
+        expect(find.text('Payment methods'), findsNothing);
       }
     );
   });
@@ -322,7 +351,11 @@ void main() {
         await tester.pump();
         
         expect(find.byType(TextFormField), findsWidgets);
-        expect(find.text('Create account'), findsOneWidget);
+        // Scoped to the button: the AppBar title carries the same text and
+        // the submit button sits below the fold in the lazy ListView, so a
+        // bare find.text is order/viewport-dependent (finds 1 or 2 widgets).
+        expect(find.widgetWithText(FilledButton, 'Create account'),
+            findsOneWidget);
         expect(find.text('Password'), findsOneWidget);
         expect(find.text('Confirm password'), findsOneWidget);
       }

@@ -127,6 +127,13 @@ class AppText {
     fontWeight: FontWeight.w700,
   );
 
+  // AppBar page title – bold, slightly larger for page headings.
+  static final TextStyle appBarTitle = GoogleFonts.roboto(
+    fontSize: 20,
+    fontWeight: FontWeight.w800,
+    color: AppColors.ink,
+  );
+
   // Labels – medium weight, standard size.
   static final TextStyle label = GoogleFonts.roboto(
     fontSize: 14,
